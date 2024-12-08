@@ -243,3 +243,111 @@ test('UserProfile Artist load Songs and total streams', async () => {
     component.queryByText(`${songMockFetch.streams} reproducciones totales`),
   ).toBeInTheDocument();
 });
+
+test('UserProfile renders correctly without playback history or playlists', async () => {
+  const userMockFetch = {
+    name: 'name',
+    photo: 'photo',
+    register_date: 'date',
+    password: 'hashpassword',
+    playback_history: [],
+    playlists: [],
+    saved_playlists: [],
+  };
+
+  jest.mock('react-router-dom', () => ({
+    ...jest.requireActual('react-router-dom'),
+    useParams: () => ({
+      id: userMockFetch.name,
+    }),
+  }));
+
+  global.fetch = jest.fn((url: string) => {
+    if (url === `${Global.backendBaseUrl}/users/${userMockFetch.name}`) {
+      return Promise.resolve({
+        json: () => userMockFetch,
+        status: 200,
+        ok: true,
+        headers: getMockHeaders(),
+      }).catch((error) => {
+        console.log(error);
+      });
+    }
+
+    // In case the URL doesn't match, return a rejected promise
+    return Promise.reject(new Error(`Unhandled URL in fetch mock: ${url}`));
+  }) as jest.Mock;
+
+  const component = await act(() => {
+    return render(
+      <MemoryRouter initialEntries={[`/user/${userMockFetch.name}`]}>
+        <NowPlayingContextProvider>
+          <Routes>
+            <Route
+              path="/user/:id"
+              element={
+                <UserProfile
+                  refreshSidebarData={jest.fn()}
+                  userType={UserType.USER}
+                />
+              }
+            />
+          </Routes>
+        </NowPlayingContextProvider>
+      </MemoryRouter>,
+    );
+  });
+
+  const elementsWithUserName = component.getAllByText(userMockFetch.name);
+
+  expect(elementsWithUserName.length).toBeGreaterThan(0);
+  expect(
+    component.queryByText('Historial de reproducción'),
+  ).not.toBeInTheDocument();
+  expect(component.queryByText('playlisttest')).not.toBeInTheDocument();
+});
+
+test('UserProfile handles fetch errors gracefully', async () => {
+  const userMockFetch = {
+    name: 'name',
+    photo: 'photo',
+    register_date: 'date',
+    password: 'hashpassword',
+    playback_history: [],
+    playlists: [],
+    saved_playlists: [],
+  };
+
+  jest.mock('react-router-dom', () => ({
+    ...jest.requireActual('react-router-dom'),
+    useParams: () => ({
+      id: userMockFetch.name,
+    }),
+  }));
+
+  global.fetch = jest.fn((url: string) => {
+    return Promise.reject(new Error('Fetch error'));
+  }) as jest.Mock;
+
+  const component = await act(() => {
+    return render(
+      <MemoryRouter initialEntries={[`/user/${userMockFetch.name}`]}>
+        <NowPlayingContextProvider>
+          <Routes>
+            <Route
+              path="/user/:id"
+              element={
+                <UserProfile
+                  refreshSidebarData={jest.fn()}
+                  userType={UserType.USER}
+                />
+              }
+            />
+          </Routes>
+        </NowPlayingContextProvider>
+      </MemoryRouter>,
+    );
+  });
+
+  expect(component.queryByText('Fetch error')).toBeInTheDocument();
+});
